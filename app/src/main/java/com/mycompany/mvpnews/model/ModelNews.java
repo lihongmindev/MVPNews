@@ -94,21 +94,27 @@ public class ModelNews implements IModelNews {
 
         @Override
         public void onServiceDisconnected(ComponentName name) {
-
+            if (timer != null){
+                timer.cancel();                        //Timer停止
+                timer = null;
+            }
         }
     };
 
     @Override
     public void readNews(String date,IRequestCallback iRequestCallback) {
         if (isNetworkAvailable(getContext())){
+
             if (iReadBehavior == null){                //保证只new出来一个iReadBehavior
                 iReadBehavior = new ReadOnLine();
             }
-            iReadBehavior.read(date,iRequestCallback);
+            if (!iReadBehavior.isOnLineBehavior()){   //如果之前一次的behavior是offline的就会返回false，重新new一个
+                iReadBehavior = new ReadOnLine();     //解决如果在看离线新闻的时候突然有网了，下拉刷新应该加载在线新闻
+            }
         }else {                                         //不需要保证只new出来一个iReadBehavior
             iReadBehavior = new ReadOffLine();
-            iReadBehavior.read(date,iRequestCallback);
         }
+        iReadBehavior.read(date,iRequestCallback);
         /*
         if (date == null){
             allRecycler.clear();      //将数组中存储的数据清空
@@ -131,8 +137,10 @@ public class ModelNews implements IModelNews {
                 if (msg.what != 100) {
                     if (msg.what == 101){
                         Toast.makeText(activity, getContext().getResources().getString(R.string.latest_news_download_fail), Toast.LENGTH_SHORT).show();
-                        timer.cancel();                                  //Timer停止
-                        timer = null;
+                        if (timer != null){
+                            timer.cancel();                        //Timer停止
+                            timer = null;
+                        }
                         Log.d("bindService ", "关闭定时器");
                         activity.unbindService(connection);              //对服务进行解绑，否则会造成内存泄漏
                         iRequestCallback.downloadProgressCallback(getContext().getResources().getString(R.string.fail));
@@ -142,8 +150,10 @@ public class ModelNews implements IModelNews {
                 } else {
                     iRequestCallback.downloadProgressCallback(getContext().getResources().getString(R.string.complete));
                     Toast.makeText(activity, getContext().getResources().getString(R.string.download_success), Toast.LENGTH_SHORT).show();
-                    timer.cancel();                        //Timer停止
-                    timer = null;
+                    if (timer != null){
+                        timer.cancel();                        //Timer停止
+                        timer = null;
+                    }
                     Log.d("bindService ", "关闭定时器");
                     activity.unbindService(connection);              //对服务进行解绑，否则会造成内存泄漏
                 }

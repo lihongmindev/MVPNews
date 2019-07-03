@@ -33,6 +33,7 @@
         <service
             android:name=".service.OffLineDownLoad"
             android:enabled="true" />
+        <activity android:name=".LoginActivity" />
     </application>
 
 </manifest>

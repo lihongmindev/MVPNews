@@ -14,8 +14,7 @@ public class Utility {
     public static LatestNews handleLatestNewsResponse(String response){
         try {
             JSONObject jsonObject = new JSONObject(response);
-            JSONObject LatestNews = jsonObject.getJSONObject("STORIES");
-            String latestNews = LatestNews.toString();
+            String latestNews = jsonObject.toString();
             return new Gson().fromJson(latestNews,LatestNews.class);
         }catch (Exception e){
             e.printStackTrace();
@@ -25,8 +24,7 @@ public class Utility {
     public static NewsContent handleNewsContentResponse(String response){
         try {
             JSONObject jsonObject = new JSONObject(response);
-            JSONObject NewsContent = jsonObject.getJSONObject("CONTENTS");
-            String newsContent = NewsContent.toString();
+            String newsContent = jsonObject.toString();
             return new Gson().fromJson(newsContent,NewsContent.class);
         }catch (Exception e){
             e.printStackTrace();

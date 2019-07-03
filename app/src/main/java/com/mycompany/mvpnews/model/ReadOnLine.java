@@ -43,11 +43,17 @@ public class ReadOnLine implements IReadBehavior {
             requestNews(date,iRequestCallback);    //请求指定日期新闻
         }
     }
+
+    @Override
+    public boolean isOnLineBehavior() {
+        return true;
+    }
+
     /**
      * 请求LastestNews信息
      */
     public void requestLatestNews(final IRequestCallback iRequestCallback) {
-        String latestNewsUrl = "https://zhihu-daily.leanapp.cn/api/v1/last-stories";
+        String latestNewsUrl = "https://news-at.zhihu.com/api/4/news/latest";
         HttpUtil.sendOkHttpRequest(latestNewsUrl, new Callback() {
             @Override
             public void onResponse(Call call, Response response) throws IOException {
@@ -69,7 +75,7 @@ public class ReadOnLine implements IReadBehavior {
      */
     private void requestNews(final String nextdate,final IRequestCallback iRequestCallback) {
         Log.d("mvp1","开始请求"+ nextdate +"新闻");
-        String latestNewsUrl = "https://zhihu-daily.leanapp.cn/api/v1/before-stories/" + nextdate;
+        String latestNewsUrl = "https://news-at.zhihu.com/api/4/news/before/" + nextdate;
         HttpUtil.sendOkHttpRequest(latestNewsUrl, new Callback() {
             @Override
             public void onResponse(Call call, Response response) throws IOException {

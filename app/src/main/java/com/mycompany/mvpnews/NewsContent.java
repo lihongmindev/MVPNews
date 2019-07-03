@@ -109,7 +109,7 @@ public class NewsContent extends AppCompatActivity {
     @SuppressLint("SetJavaScriptEnabled")
     public void requestNewsContent(String news_id, final View view_content){
 
-        String newsContentUrl = "https://zhihu-daily.leanapp.cn/api/v1/contents/"+ news_id;
+        String newsContentUrl = "https://news-at.zhihu.com/api/4/news/"+ news_id;
 
             HttpUtil.sendOkHttpRequest(newsContentUrl, new Callback() {
                 @Override

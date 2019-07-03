@@ -8,6 +8,7 @@ import android.support.annotation.NonNull;
 import android.support.design.widget.NavigationView;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
+import android.support.v4.view.GravityCompat;
 import android.support.v4.widget.DrawerLayout;
 import android.support.v4.widget.SwipeRefreshLayout;
 import android.support.v7.app.ActionBar;
@@ -16,13 +17,18 @@ import android.os.Bundle;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.util.Log;
+import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.widget.Toolbar;
 
+import com.mycompany.mvpnews.Observer.IObserver;
 import com.mycompany.mvpnews.adapter.RecyclerAdapter;
 import com.mycompany.mvpnews.bean.RecyclerList;
+import com.mycompany.mvpnews.event.LoginEvent;
 import com.mycompany.mvpnews.model.IModelNews;
 import com.mycompany.mvpnews.model.IRequestCallback;
 import com.mycompany.mvpnews.model.ModelNews;
@@ -30,6 +36,9 @@ import com.mycompany.mvpnews.presenter.PresenterNews;
 import com.mycompany.mvpnews.util.TimeUtil;
 import com.mycompany.mvpnews.view.IViewNews;
 
+import org.greenrobot.eventbus.EventBus;
+import org.greenrobot.eventbus.Subscribe;
+import org.greenrobot.eventbus.ThreadMode;
 import org.litepal.crud.DataSupport;
 
 import java.text.SimpleDateFormat;
@@ -41,7 +50,7 @@ import java.util.Locale;
 import static java.lang.Integer.valueOf;
 import static java.lang.String.format;
 
-public class MainActivity extends AppCompatActivity implements IViewNews {
+public class MainActivity extends AppCompatActivity implements IViewNews{
 
     private DrawerLayout mDrawerLayout;
     private SwipeRefreshLayout swipeRefreshLayout;
@@ -55,6 +64,9 @@ public class MainActivity extends AppCompatActivity implements IViewNews {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         context = MainActivity.this;
+
+        android.support.v7.widget.Toolbar toolbar = findViewById(R.id.toolbar);
+        setSupportActionBar(toolbar);
 
         //侧滑菜单
         mDrawerLayout = findViewById(R.id.drawer_layout);
@@ -88,6 +100,15 @@ public class MainActivity extends AppCompatActivity implements IViewNews {
                 }
             }
         });
+        TextView textView1 = view.findViewById(R.id.username);
+        textView1.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {        //请登录的监听事件
+                Intent intent = new Intent(MainActivity.this, LoginActivity.class);
+                startActivity(intent);               //跳转到登陆活动
+            }
+        });
+        EventBus.getDefault().register(this);   //注册EventBus
         /*
         下拉刷新设置
          */
@@ -132,6 +153,49 @@ public class MainActivity extends AppCompatActivity implements IViewNews {
         presenterNews.readNews();    //请求今天的新闻
 
     }
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        EventBus.getDefault().unregister(this);   //注销EventBus
+
+    }
+
+    /**
+     * 事件响应方法
+     * 接收消息
+     * @param event
+     */
+    @Subscribe(threadMode = ThreadMode.MAIN)
+    public void onEvent(LoginEvent event) {
+        String msg = event.getMessage();
+        NavigationView navigationView = findViewById(R.id.nav_view);
+        //获得NavigationView的头部view,从而绑定里面的控件
+        View view = navigationView.getHeaderView(0);
+        ImageView pic = view.findViewById(R.id.icon_image);
+        TextView textView1 = view.findViewById(R.id.username);
+        textView1.setText(msg);              //登陆后用户名和头像变化
+        pic.setImageResource(R.drawable.pic);
+    }
+    public boolean onCreateOptionsMenu(Menu menu) {
+        getMenuInflater().inflate(R.menu.toolbar, menu);
+        return true;
+    }
+    public boolean onOptionsItemSelected(MenuItem item) {
+
+        switch (item.getItemId()) {
+            case android.R.id.home:
+                mDrawerLayout.openDrawer(GravityCompat.START);
+                break;
+            case R.id.backup:
+                Toast.makeText(this, "You clicked Backup", Toast.LENGTH_SHORT).show();
+                break;
+            case R.id.settings:
+                Toast.makeText(this, "You clicked Settings", Toast.LENGTH_SHORT).show();
+                break;
+            default:
+        }
+        return true;
+    }
 
 
     @Override
@@ -173,4 +237,5 @@ public class MainActivity extends AppCompatActivity implements IViewNews {
             default:
         }
     }
+
 }

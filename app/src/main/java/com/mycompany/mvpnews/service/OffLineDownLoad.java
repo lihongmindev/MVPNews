@@ -11,6 +11,8 @@ import android.util.Log;
 
 import com.bumptech.glide.Glide;
 import com.bumptech.glide.request.target.Target;
+import com.mycompany.mvpnews.Observer.ISubject;
+import com.mycompany.mvpnews.Observer.IObserver;
 import com.mycompany.mvpnews.db.BeforeNews;
 import com.mycompany.mvpnews.db.TodayNews;
 import com.mycompany.mvpnews.db.TopNews;
@@ -19,6 +21,7 @@ import com.mycompany.mvpnews.gson.LatestStories;
 import com.mycompany.mvpnews.gson.Top_Stories;
 import com.mycompany.mvpnews.threadpool.ThreadPoolProxyFactory;
 import com.mycompany.mvpnews.util.HttpUtil;
+import com.mycompany.mvpnews.util.TimeUtil;
 import com.mycompany.mvpnews.util.Utility;
 
 import org.litepal.crud.DataSupport;
@@ -28,6 +31,7 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
@@ -40,7 +44,7 @@ import okhttp3.Response;
 
 import static java.lang.String.format;
 
-public class OffLineDownLoad extends Service {
+public class OffLineDownLoad extends Service implements ISubject {
 
     private int numTopNews = 0;
     private int numTodayNews = 0;
@@ -55,9 +59,34 @@ public class OffLineDownLoad extends Service {
     private int topNewsCounts = 0;        //topNews的总条数
     private int todayNewsCounts = 0;
     private int downloadprogress = 0;
+    private boolean newData = false;      //是否下载了新的新闻
+    private ArrayList observers;
 
 
     private DownloadBinder mBinder = new DownloadBinder();
+
+    @Override
+    public void registerObserver(IObserver o) {
+        observers.add(o);
+    }
+
+    @Override
+    public void removerObserver(IObserver o) {
+        int i = observers.indexOf(o);
+        if (i >= 0){
+            observers.remove(i);
+        }
+    }
+
+    @Override
+    public void notifyObservers() {
+        if (observers != null){
+            for (int i=0; i < observers.size(); i++){
+                IObserver observer = (IObserver)observers.get(i);
+                observer.update();
+            }
+        }
+    }
 
     public class DownloadBinder extends Binder {
         public int getProgress() {
@@ -115,7 +144,7 @@ public class OffLineDownLoad extends Service {
     public void requestLatestNews() {
 
         Log.d("tag", "start requestLatestNews");
-        String latestNewsUrl = "https://zhihu-daily.leanapp.cn/api/v1/last-stories";
+        String latestNewsUrl = "https://news-at.zhihu.com/api/4/news/latest";
         HttpUtil.sendOkHttpRequest(latestNewsUrl, new Callback() {
             @Override
             public void onResponse(Call call, Response response) throws IOException {
@@ -138,7 +167,6 @@ public class OffLineDownLoad extends Service {
                                 String newid = latestStories.newId;               //Today新闻ID
                                 requestTodayNewsContent(newid, todayNewsCounts, LatestDate);   //请求Today新闻
                             }
-
                         } else {
                             downloadprogress = 101;
                         }
@@ -158,7 +186,7 @@ public class OffLineDownLoad extends Service {
 
     public void requestTopNewsContent(String news_id, final int newsCounts) {
         Log.d("tag", "start request top NewsContent " + news_id);
-        String newsContentUrl = "https://zhihu-daily.leanapp.cn/api/v1/contents/" + news_id;
+        String newsContentUrl = "https://news-at.zhihu.com/api/4/news/" + news_id;
         HttpUtil.sendOkHttpRequest(newsContentUrl, new Callback() {
             @Override
             public void onResponse(Call call, Response response) throws IOException {
@@ -192,6 +220,7 @@ public class OffLineDownLoad extends Service {
                                 Thread thread = new saveImage(newImage, newid);  //需要将图片下载好存在目录中取用
                                 ThreadPoolProxyFactory.getDownLoadThreadPoolProxy().execute(thread);
                                 //thread.start();
+                                newData = true;
                                 Log.d("tag", "insert top news " + newTitle);
                             }
                             numTopNews++;        //每插入一条数据加一
@@ -204,6 +233,9 @@ public class OffLineDownLoad extends Service {
                                 Log.d("tag", "fTopNewsGet " + true);
                             }
                             if (fTopNewsGet && fTodayNewsGet && fBeforeNewsGet) {
+                                if (newData){
+                                    notifyObservers();
+                                }
                                 Intent intent = new Intent("com.mycompany.news.offlinedownload");
                                 sendBroadcast(intent);      //发送广播
                                 Log.d("tag", "TopNews发送广播");
@@ -227,7 +259,7 @@ public class OffLineDownLoad extends Service {
 
     public void requestTodayNewsContent(String news_id, final int newsCounts, final String today) {
         Log.d("tag", "start request today NewsContent " + news_id);
-        String newsContentUrl = "https://zhihu-daily.leanapp.cn/api/v1/contents/" + news_id;
+        String newsContentUrl = "https://news-at.zhihu.com/api/4/news/" + news_id;
         HttpUtil.sendOkHttpRequest(newsContentUrl, new Callback() {
             @Override
             public void onResponse(Call call, Response response) throws IOException {
@@ -249,6 +281,11 @@ public class OffLineDownLoad extends Service {
                             for (String newJsa : newsContent.NewJs) {
                                 newJs = newJsa;
                             }
+                            if ((DataSupport.findAll(TodayNews.class)).size()>0){
+                                if ( DataSupport.where("date = ?", TimeUtil.getToday()).find(TodayNews.class).size()==0){
+                                    DataSupport.deleteAll(TodayNews.class);       //表中有不是今天新闻的内容，删除
+                                }
+                            }
                             List<TodayNews> todaynews = DataSupport.where("newid = ?", newid).find(TodayNews.class);
                             if (todaynews.size() == 0) {          //如果表中存在一个这个id的数据，证明已经下载了这张照片
                                 TodayNews todayNews = new TodayNews();
@@ -263,6 +300,7 @@ public class OffLineDownLoad extends Service {
                                 Thread thread = new saveImage(newImage, newid);  //需要将图片下载好存在目录中取用
                                 ThreadPoolProxyFactory.getDownLoadThreadPoolProxy().execute(thread);
                                 //thread.start();
+                                newData = true;
                                 Log.d("tag", "insert today news " + newTitle);
                             }
                             numTodayNews++;      //每插入一条数据加一
@@ -275,6 +313,9 @@ public class OffLineDownLoad extends Service {
                                 Log.d("tag", "fTodayNewsGet " + true);
                             }
                             if (fTopNewsGet && fTodayNewsGet && fBeforeNewsGet) {
+                                if (newData){
+                                    notifyObservers();
+                                }
                                 //发送广播
                                 Intent intent = new Intent("com.mycompany.news.offlinedownload");
                                 sendBroadcast(intent);      //发送广播
@@ -300,7 +341,7 @@ public class OffLineDownLoad extends Service {
 
     public void requestBeforeNews(String lastDate) {
         Log.d("tag", "start requestBeforeNews");
-        String latestNewsUrl = "https://zhihu-daily.leanapp.cn/api/v1/before-stories/" + lastDate;
+        String latestNewsUrl = "https://news-at.zhihu.com/api/4/news/before/" + lastDate;
         HttpUtil.sendOkHttpRequest(latestNewsUrl, new Callback() {
             @Override
             public void onResponse(Call call, Response response) throws IOException {
@@ -339,7 +380,7 @@ public class OffLineDownLoad extends Service {
     public void requestBeforeNewsContent(String news_id, final String beforeDate) {
 
         Log.d("tag", "start request before NewsContent " + news_id);
-        String newsContentUrl = "https://zhihu-daily.leanapp.cn/api/v1/contents/" + news_id;
+        String newsContentUrl = "https://news-at.zhihu.com/api/4/news/" + news_id;
         HttpUtil.sendOkHttpRequest(newsContentUrl, new Callback() {
             @Override
             public void onResponse(Call call, Response response) throws IOException {
@@ -375,6 +416,7 @@ public class OffLineDownLoad extends Service {
                                 Thread thread = new saveImage(newImage, newid);  //需要将图片下载好存在目录中取用
                                 ThreadPoolProxyFactory.getDownLoadThreadPoolProxy().execute(thread);
                                 //thread.start();
+                                newData = true;
                                 Log.d("tag", "insert before news " + newTitle);
                             }
                             numBeforeNews++;      //每插入一条数据加一
@@ -387,6 +429,9 @@ public class OffLineDownLoad extends Service {
                                 Log.d("tag", "fBeforeNewsGet " + true);
                             }
                             if (fTopNewsGet && fTodayNewsGet && fBeforeNewsGet) {
+                                if (newData){
+                                    notifyObservers();
+                                }
                                 //发送广播
                                 Intent intent = new Intent("com.mycompany.news.offlinedownload");
                                 sendBroadcast(intent);        //发送广播

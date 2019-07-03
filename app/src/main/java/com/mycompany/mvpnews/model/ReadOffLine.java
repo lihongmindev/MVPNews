@@ -2,6 +2,7 @@ package com.mycompany.mvpnews.model;
 
 import android.util.Log;
 
+import com.mycompany.mvpnews.Observer.IObserver;
 import com.mycompany.mvpnews.bean.News;
 import com.mycompany.mvpnews.bean.RecyclerList;
 import com.mycompany.mvpnews.db.BeforeNews;
@@ -20,7 +21,7 @@ import java.util.Locale;
 import static java.lang.Integer.valueOf;
 import static java.lang.String.format;
 
-public class ReadOffLine implements IReadBehavior {
+public class ReadOffLine implements IReadBehavior,IObserver {
 
     /**
      * TopNews列表
@@ -56,6 +57,11 @@ public class ReadOffLine implements IReadBehavior {
             m = 0;
             requestDataNews(TimeUtil.getToday(),iRequestCallback);   //请求顶部新闻和今日新闻
         }
+    }
+
+    @Override
+    public boolean isOnLineBehavior() {
+        return false;
     }
 
     public void requestDataNews(String today, IRequestCallback iRequestCallback){
@@ -111,5 +117,12 @@ public class ReadOffLine implements IReadBehavior {
             }
         }
         iRequestCallback.requestCallback(allRecycler);
+    }
+
+    @Override
+    public void update() {
+        topNewsList = DataSupport.findAll(TopNews.class);
+        todayNewsList = DataSupport.findAll(TodayNews.class);
+        beforeNewsList = DataSupport.findAll(BeforeNews.class);
     }
 }
